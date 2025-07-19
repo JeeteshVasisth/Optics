@@ -4,6 +4,14 @@
 
 This is a Flask-based web application for calculating optical parameters and visualizing ray diagrams for mirrors and lenses. The application provides an interactive interface where users can input optical system parameters and receive calculated results along with visual ray diagrams.
 
+## Recent Changes (July 2025)
+
+- Fixed mirror sign conventions: v < 0 = real image, v > 0 = virtual image for mirrors
+- Enhanced mirror scaling for better visibility with small focal lengths
+- Improved ray diagram generation with proper infinite value handling
+- Corrected second ray positioning to hit mirror at object height and end at image height
+- Added comprehensive error handling for focal point scenarios (f = u)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
