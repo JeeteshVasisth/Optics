@@ -553,6 +553,12 @@ class OpticsCalculator:
         if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
             return
         
+        # Skip ray drawing for infinite values
+        if (math.isinf(self.u) or math.isinf(self.v) or 
+            math.isinf(self.h1) or math.isinf(self.h2) or 
+            math.isinf(self.focal_length)):
+            return
+        
         try:
             # Ensure all values are numeric
             u_val = float(self.u)
@@ -607,6 +613,12 @@ class OpticsCalculator:
     def _draw_lens_rays(self, shape):
         """Draw principal rays for lenses"""
         if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
+            return
+        
+        # Skip ray drawing for infinite values
+        if (math.isinf(self.u) or math.isinf(self.v) or 
+            math.isinf(self.h1) or math.isinf(self.h2) or 
+            math.isinf(self.focal_length)):
             return
         
         try:
@@ -680,15 +692,24 @@ def calculate():
         # Generate diagram
         diagram_base64 = calculator.generate_diagram(optic_type, shape)
         
+        # Convert infinite values to strings for JSON response
+        def safe_value(val):
+            if val is None:
+                return None
+            elif math.isinf(val):
+                return "∞" if val > 0 else "-∞"
+            else:
+                return val
+        
         # Prepare response
         result = {
             'success': True,
             'results': {
-                'focal_length': calculator.focal_length,
-                'u': calculator.u,
-                'v': calculator.v,
-                'h1': calculator.h1,
-                'h2': calculator.h2
+                'focal_length': safe_value(calculator.focal_length),
+                'u': safe_value(calculator.u),
+                'v': safe_value(calculator.v),
+                'h1': safe_value(calculator.h1),
+                'h2': safe_value(calculator.h2)
             },
             'diagram': diagram_base64,
             'warnings': calculator.warnings
