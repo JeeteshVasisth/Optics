@@ -512,19 +512,28 @@ class OpticsCalculator:
     
     def _draw_mirror_surface(self, shape, axis_range):
         """Draw mirror surface"""
+        # Make mirror height proportional to axis range but ensure minimum visibility
+        mirror_height = max(axis_range * 0.6, 10)  # At least 10 units tall
+        
         if shape == 'concave':
             # Concave mirror (curves inward toward the object)
             theta = np.linspace(-np.pi/3, np.pi/3, 100)
-            radius = abs(self.focal_length) * 2 if self.focal_length else 10
-            x = radius * 0.1 * np.cos(theta)  # Positive x curves toward the right (inward)
-            y = radius * np.sin(theta)
+            radius = abs(self.focal_length) * 2 if self.focal_length else 20
+            
+            # Scale the curvature based on axis range for better visibility
+            curvature_scale = max(axis_range * 0.05, 2)  # Minimum 2 units of curvature
+            x = curvature_scale * np.cos(theta)  # Positive x curves toward the right (inward)
+            y = mirror_height * np.sin(theta) / 2  # Scale y to mirror height
             plt.plot(x, y, 'red', linewidth=4, label='Concave Mirror')
         else:
             # Convex mirror (curves outward away from the object)
             theta = np.linspace(-np.pi/3, np.pi/3, 100)
-            radius = abs(self.focal_length) * 2 if self.focal_length else 10
-            x = -radius * 0.1 * np.cos(theta)  # Negative x curves toward the left (outward)
-            y = radius * np.sin(theta)
+            radius = abs(self.focal_length) * 2 if self.focal_length else 20
+            
+            # Scale the curvature based on axis range for better visibility
+            curvature_scale = max(axis_range * 0.05, 2)  # Minimum 2 units of curvature
+            x = -curvature_scale * np.cos(theta)  # Negative x curves toward the left (outward)
+            y = mirror_height * np.sin(theta) / 2  # Scale y to mirror height
             plt.plot(x, y, 'red', linewidth=4, label='Convex Mirror')
     
     def _draw_lens_surface(self, shape, axis_range):
@@ -568,8 +577,20 @@ class OpticsCalculator:
             f_val = float(self.focal_length)
             
             # Calculate mirror surface position for ray intersection
-            radius = abs(f_val) * 2
-            mirror_x = radius * 0.1 if shape == 'concave' else -radius * 0.1
+            # Use the same scaling as in _draw_mirror_surface
+            distances = []
+            if self.u is not None and not math.isinf(self.u):
+                distances.append(abs(self.u))
+            if self.v is not None and not math.isinf(self.v):
+                distances.append(abs(self.v))
+            if self.focal_length is not None and not math.isinf(self.focal_length):
+                distances.append(abs(self.focal_length))
+            
+            max_dist = max(distances) if distances else 10
+            axis_range = max_dist * 1.3
+            curvature_scale = max(axis_range * 0.05, 2)  # Same as in mirror surface drawing
+            
+            mirror_x = curvature_scale if shape == 'concave' else -curvature_scale
             
             # Determine if rays should be dotted (for virtual AND erect images)
             # For mirrors: Virtual images have v > 0, erect images have same sign for h1 and h2
