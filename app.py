@@ -459,12 +459,19 @@ class OpticsCalculator:
             # Ray 2: Through focus to mirror, reflects parallel to axis
             if shape == 'concave':
                 # Ray from object tip through focus to mirror
-                # Calculate where ray through focus hits the mirror
-                # For simplicity, we'll show it going from object to focus, then to mirror, then parallel
-                plt.plot([u_val, f_val], [h1_val, 0], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
-                plt.plot([f_val, mirror_x], [0, h1_val], 'red', linewidth=2, alpha=0.8)
-                # Reflected ray goes parallel to axis
-                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
+                # Calculate where the ray through focus intersects the mirror surface
+                # The ray goes from (u_val, h1_val) through (f_val, 0) and hits the mirror
+                
+                # Calculate the slope and find intersection with mirror
+                if f_val != u_val:  # Avoid division by zero
+                    slope = (0 - h1_val) / (f_val - u_val)
+                    # Find y-coordinate where ray hits mirror at x = mirror_x
+                    mirror_y_intersect = h1_val + slope * (mirror_x - u_val)
+                    
+                    # Draw ray from object through focus to mirror
+                    plt.plot([u_val, mirror_x], [h1_val, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
+                    # Reflected ray goes parallel to axis (same height as intersection point)
+                    plt.plot([mirror_x, v_val], [mirror_y_intersect, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
             else:
                 # For convex mirror: ray aimed toward focus (behind mirror) reflects parallel
                 plt.plot([u_val, mirror_x], [h1_val, h1_val], 'red', linewidth=2, alpha=0.8, label='Ray 2: Toward focus')
