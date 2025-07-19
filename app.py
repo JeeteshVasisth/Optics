@@ -616,8 +616,10 @@ class OpticsCalculator:
                     
                     # Draw ray from object through focus to mirror
                     plt.plot([u_val, mirror_x], [h1_val, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
-                    # Reflected ray goes parallel to axis (same height as intersection point)
-                    plt.plot([mirror_x, v_val], [mirror_y_intersect, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
+                    # Reflected ray goes parallel to axis (constant height = mirror_y_intersect)
+                    # Draw it to a reasonable distance to show it's parallel
+                    parallel_end_x = v_val if not math.isinf(v_val) else max_dist
+                    plt.plot([mirror_x, parallel_end_x], [mirror_y_intersect, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
             else:
                 # For convex mirror: ray aimed toward focus (behind mirror) reflects parallel
                 plt.plot([u_val, mirror_x], [h1_val, h1_val], 'red', linewidth=2, alpha=0.8, label='Ray 2: Toward focus')
