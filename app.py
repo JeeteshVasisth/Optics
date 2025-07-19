@@ -33,33 +33,55 @@ class OpticsCalculator:
         self.errors = []
         self.warnings = []
         
+        # Check if optic type and shape are provided
+        if not optic_type or not shape:
+            self.errors.append("Please select both optic type and shape")
+            return False
+        
         # Extract and validate focal length
         if data.get('focal_length') is not None:
-            f = float(data['focal_length'])
-            if f == 0:
-                self.errors.append("Focal length cannot be zero")
-            elif optic_type == 'mirror':
-                if shape == 'concave' and f <= 0:
-                    self.errors.append("Concave mirror focal length must be positive")
-                elif shape == 'convex' and f <= 0:
-                    self.errors.append("Convex mirror focal length must be positive")
-            else:  # lens
-                if shape == 'convex' and f <= 0:
-                    self.errors.append("Convex lens focal length must be positive")
-                elif shape == 'concave' and f >= 0:
-                    self.errors.append("Concave lens focal length must be negative")
+            try:
+                f = float(data['focal_length'])
+                if f == 0:
+                    self.errors.append("Focal length cannot be zero")
+                elif optic_type == 'mirror':
+                    # For mirrors, both concave and convex typically have positive focal lengths
+                    # The sign convention varies, but we'll use positive for both
+                    if f <= 0:
+                        self.warnings.append(f"Using absolute value of focal length for {shape} mirror")
+                else:  # lens
+                    if shape == 'convex' and f <= 0:
+                        self.warnings.append("Convex lens focal length should be positive")
+                    elif shape == 'concave' and f >= 0:
+                        self.warnings.append("Concave lens focal length should be negative")
+            except (ValueError, TypeError):
+                self.errors.append("Focal length must be a valid number")
         
         # Validate object distance (should be negative by sign convention)
         if data.get('u') is not None:
-            u = float(data['u'])
-            if u >= 0:
-                self.errors.append("Object distance (u) must be negative (object is on the left side)")
+            try:
+                u = float(data['u'])
+                if u >= 0:
+                    self.errors.append("Object distance (u) must be negative (object is on the left side)")
+            except (ValueError, TypeError):
+                self.errors.append("Object distance must be a valid number")
         
         # Validate object height (should be positive)
         if data.get('h1') is not None:
-            h1 = float(data['h1'])
-            if h1 <= 0:
-                self.errors.append("Object height (h1) must be positive")
+            try:
+                h1 = float(data['h1'])
+                if h1 <= 0:
+                    self.errors.append("Object height (h1) must be positive")
+            except (ValueError, TypeError):
+                self.errors.append("Object height must be a valid number")
+        
+        # Validate other numeric inputs
+        for key in ['v', 'h2']:
+            if data.get(key) is not None:
+                try:
+                    float(data[key])
+                except (ValueError, TypeError):
+                    self.errors.append(f"{key} must be a valid number")
         
         # Count non-None values
         given_values = sum(1 for key in ['focal_length', 'u', 'v', 'h1', 'h2'] 
@@ -408,36 +430,57 @@ class OpticsCalculator:
         if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
             return
         
-        # Ray 1: Parallel to axis, reflects through focus
-        plt.plot([self.u, 0], [self.h1, self.h1], 'gray', linewidth=1.5, alpha=0.8)
-        plt.plot([0, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
-        
-        # Ray 2: Through focus, reflects parallel to axis
-        plt.plot([self.u, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
-        plt.plot([self.focal_length, self.v], [0, self.h2], 'gray', linewidth=1.5, alpha=0.8)
-        
-        # Ray 3: Through center of curvature
-        center = 2 * self.focal_length if self.focal_length else 0
-        plt.plot([self.u, center], [self.h1, 0], 'lightblue', linewidth=1, alpha=0.6)
-        plt.plot([center, self.v], [0, self.h2], 'lightblue', linewidth=1, alpha=0.6)
+        try:
+            # Ensure all values are numeric
+            u_val = float(self.u)
+            v_val = float(self.v)
+            h1_val = float(self.h1)
+            h2_val = float(self.h2)
+            f_val = float(self.focal_length)
+            
+            # Ray 1: Parallel to axis, reflects through focus
+            plt.plot([u_val, 0], [h1_val, h1_val], 'gray', linewidth=1.5, alpha=0.8, label='Incident Ray')
+            plt.plot([0, v_val], [h1_val, h2_val], 'gray', linewidth=1.5, alpha=0.8, label='Reflected Ray')
+            
+            # Ray 2: Through focus, reflects parallel to axis
+            if shape == 'concave':
+                plt.plot([u_val, f_val], [h1_val, 0], 'lightblue', linewidth=1.5, alpha=0.8)
+                plt.plot([f_val, v_val], [0, h2_val], 'lightblue', linewidth=1.5, alpha=0.8)
+            
+            # Ray 3: Through center of curvature
+            center = 2 * f_val
+            plt.plot([u_val, center], [h1_val, 0], 'lightgreen', linewidth=1, alpha=0.6)
+            plt.plot([center, v_val], [0, h2_val], 'lightgreen', linewidth=1, alpha=0.6)
+        except (ValueError, TypeError):
+            pass  # Skip ray drawing if values are invalid
     
     def _draw_lens_rays(self, shape):
         """Draw principal rays for lenses"""
         if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
             return
         
-        # Ray 1: Parallel to axis, refracts through focus
-        plt.plot([self.u, 0], [self.h1, self.h1], 'gray', linewidth=1.5, alpha=0.8)
-        plt.plot([0, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
-        
-        # Ray 2: Through optical center (undeviated)
-        plt.plot([self.u, 0], [self.h1, 0], 'lightblue', linewidth=1.5, alpha=0.8)
-        plt.plot([0, self.v], [0, self.h2], 'lightblue', linewidth=1.5, alpha=0.8)
-        
-        # Ray 3: Through focus, emerges parallel to axis
-        plt.plot([self.u, -self.focal_length], [self.h1, 0], 'lightgreen', linewidth=1, alpha=0.6)
-        plt.plot([-self.focal_length, 0], [0, self.h1], 'lightgreen', linewidth=1, alpha=0.6)
-        plt.plot([0, self.v], [self.h1, self.h2], 'lightgreen', linewidth=1, alpha=0.6)
+        try:
+            # Ensure all values are numeric
+            u_val = float(self.u)
+            v_val = float(self.v)
+            h1_val = float(self.h1)
+            h2_val = float(self.h2)
+            f_val = float(self.focal_length)
+            
+            # Ray 1: Parallel to axis, refracts through focus
+            plt.plot([u_val, 0], [h1_val, h1_val], 'gray', linewidth=1.5, alpha=0.8, label='Incident Ray')
+            plt.plot([0, v_val], [h1_val, h2_val], 'gray', linewidth=1.5, alpha=0.8, label='Refracted Ray')
+            
+            # Ray 2: Through optical center (undeviated)
+            plt.plot([u_val, v_val], [h1_val, h2_val], 'lightblue', linewidth=1.5, alpha=0.8, label='Central Ray')
+            
+            # Ray 3: Through focus, emerges parallel to axis (for convex lens)
+            if shape == 'convex' and f_val > 0:
+                plt.plot([u_val, -f_val], [h1_val, 0], 'lightgreen', linewidth=1, alpha=0.6)
+                plt.plot([-f_val, 0], [0, h1_val], 'lightgreen', linewidth=1, alpha=0.6)
+                plt.plot([0, v_val], [h1_val, h2_val], 'lightgreen', linewidth=1, alpha=0.6)
+        except (ValueError, TypeError):
+            pass  # Skip ray drawing if values are invalid
 
 @app.route('/')
 def index():
