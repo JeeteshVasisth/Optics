@@ -312,6 +312,10 @@ class OpticsCalculator:
     
     def generate_diagram(self, optic_type, shape):
         """Generate enhanced ray diagram"""
+        # Skip diagram generation for focal point cases (infinite values)
+        if (self.u is not None and math.isinf(self.u)) or (self.v is not None and math.isinf(self.v)):
+            return self._generate_focal_point_diagram(optic_type, shape)
+        
         plt.figure(figsize=(14, 10))
         plt.style.use('default')
         
@@ -339,11 +343,80 @@ class OpticsCalculator:
             plt.close()
             return None
     
+    def _generate_focal_point_diagram(self, optic_type, shape):
+        """Generate a special diagram for focal point cases showing parallel rays"""
+        plt.figure(figsize=(14, 10))
+        plt.style.use('default')
+        
+        try:
+            # Use finite values for plotting
+            f_val = abs(self.focal_length) if self.focal_length else 20
+            axis_range = f_val * 3
+            
+            # Principal axis
+            plt.axhline(y=0, color='black', linewidth=1, linestyle='-', alpha=0.8)
+            plt.axvline(x=0, color='gray', linewidth=0.5, linestyle='--', alpha=0.5)
+            
+            # Draw optic surface
+            if optic_type == 'mirror':
+                self._draw_mirror_surface(shape, axis_range)
+                # Focus point
+                plt.plot(self.focal_length, 0, 'ro', markersize=8, label=f'Focus F (f={self.focal_length})')
+                # Object at focus
+                obj_x = self.focal_length
+                obj_h = f_val * 0.3
+                plt.arrow(obj_x, 0, 0, obj_h, head_width=axis_range*0.02, 
+                         head_length=obj_h*0.1, fc='blue', ec='blue', linewidth=3)
+                plt.text(obj_x, obj_h*1.1, 'Object at Focus', ha='center', fontsize=10, color='blue')
+                
+                # Draw parallel reflected rays
+                for i in range(3):
+                    y_start = obj_h * (0.3 + i * 0.35)
+                    # Ray from object to mirror
+                    plt.arrow(obj_x, y_start, -obj_x, 0, head_width=0, head_length=0, 
+                             fc='red', ec='red', linewidth=2, linestyle='-')
+                    # Parallel reflected ray
+                    plt.arrow(0, y_start, -axis_range*0.8, 0, head_width=axis_range*0.02, 
+                             head_length=axis_range*0.03, fc='red', ec='red', linewidth=2)
+                
+                plt.text(-axis_range*0.7, obj_h*0.7, 'Parallel Rays\n(Image at ∞)', 
+                        ha='center', fontsize=12, color='red', bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+            
+            plt.xlim(-axis_range, axis_range)
+            plt.ylim(-axis_range*0.6, axis_range*0.6)
+            plt.xlabel('Distance', fontsize=12)
+            plt.ylabel('Height', fontsize=12)
+            plt.title(f'{shape.title()} {optic_type.title()} - Object at Focal Point', fontsize=14, fontweight='bold')
+            plt.grid(True, alpha=0.3)
+            plt.legend(loc='upper right', fontsize=10)
+            plt.tight_layout()
+            
+            # Convert to base64
+            img_buffer = io.BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            img_buffer.seek(0)
+            img_str = base64.b64encode(img_buffer.read()).decode()
+            plt.close()
+            
+            return img_str
+        except Exception as e:
+            logging.error(f"Error generating focal point diagram: {str(e)}")
+            plt.close()
+            return None
+    
     def _draw_mirror_diagram(self, shape):
         """Draw enhanced mirror ray diagram"""
-        # Set up coordinate system
-        max_dist = max(abs(self.u) if self.u else 10, abs(self.v) if self.v else 10, 
-                      abs(self.focal_length) if self.focal_length else 10)
+        # Set up coordinate system with finite values only
+        distances = []
+        if self.u is not None and not math.isinf(self.u):
+            distances.append(abs(self.u))
+        if self.v is not None and not math.isinf(self.v):
+            distances.append(abs(self.v))
+        if self.focal_length is not None and not math.isinf(self.focal_length):
+            distances.append(abs(self.focal_length))
+        
+        max_dist = max(distances) if distances else 10
         axis_range = max_dist * 1.3
         
         # Principal axis
@@ -385,9 +458,16 @@ class OpticsCalculator:
     
     def _draw_lens_diagram(self, shape):
         """Draw enhanced lens ray diagram"""
-        # Set up coordinate system
-        max_dist = max(abs(self.u) if self.u else 10, abs(self.v) if self.v else 10, 
-                      abs(self.focal_length) if self.focal_length else 10)
+        # Set up coordinate system with finite values only
+        distances = []
+        if self.u is not None and not math.isinf(self.u):
+            distances.append(abs(self.u))
+        if self.v is not None and not math.isinf(self.v):
+            distances.append(abs(self.v))
+        if self.focal_length is not None and not math.isinf(self.focal_length):
+            distances.append(abs(self.focal_length))
+        
+        max_dist = max(distances) if distances else 10
         axis_range = max_dist * 1.3
         
         # Principal axis
