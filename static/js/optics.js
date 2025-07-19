@@ -114,6 +114,10 @@ class OpticsCalculator {
             }
         });
 
+        // Debug logging
+        console.log('Form data being sent:', data);
+        console.log('Number of parameters:', Object.keys(data).filter(k => k !== 'optic_type' && k !== 'shape').length);
+
         try {
             const response = await fetch('/calculate', {
                 method: 'POST',
@@ -124,6 +128,7 @@ class OpticsCalculator {
             });
 
             const result = await response.json();
+            console.log('Server response:', result);
             
             if (result.success) {
                 this.displayResults(result);
