@@ -104,9 +104,9 @@ class OpticsCalculator:
         # Apply sign conventions for mirrors
         if self.focal_length is not None:
             if shape == 'concave' and self.focal_length > 0:
-                self.focal_length = abs(self.focal_length)   # Concave mirrors have positive focal length  
+                self.focal_length = -abs(self.focal_length)  # Concave mirrors have negative focal length
             elif shape == 'convex' and self.focal_length < 0:
-                self.focal_length = -abs(self.focal_length)  # Convex mirrors have negative focal length
+                self.focal_length = abs(self.focal_length)   # Convex mirrors have positive focal length
         
         try:
             # Mirror formula: 1/f = 1/u + 1/v
@@ -241,11 +241,17 @@ class OpticsCalculator:
         
         magnification = abs(self.h2 / self.h1) if self.h1 != 0 else 0
         
-        # Image nature
-        if self.v > 0:
-            nature = "Real"
-        else:
-            nature = "Virtual"
+        # Image nature (for mirrors: negative v means real, positive v means virtual)
+        if optic_type == 'mirror':
+            if self.v < 0:
+                nature = "Real"
+            else:
+                nature = "Virtual"
+        else:  # lens
+            if self.v > 0:
+                nature = "Real"
+            else:
+                nature = "Virtual"
         
         # Image orientation
         if optic_type == 'mirror':
@@ -450,8 +456,8 @@ class OpticsCalculator:
             mirror_x = radius * 0.1 if shape == 'concave' else -radius * 0.1
             
             # Determine if rays should be dotted (for virtual AND erect images)
-            # Virtual images have v < 0, erect images have same sign for h1 and h2
-            is_virtual = v_val < 0
+            # For mirrors: Virtual images have v > 0, erect images have same sign for h1 and h2
+            is_virtual = v_val > 0  # For mirrors: positive v means virtual
             is_erect = (h1_val * h2_val) > 0  # Same sign means erect
             ray_style = '--' if (is_virtual and is_erect) else '-'  # Dotted only for virtual AND erect
             
