@@ -390,17 +390,17 @@ class OpticsCalculator:
     def _draw_mirror_surface(self, shape, axis_range):
         """Draw mirror surface"""
         if shape == 'concave':
-            # Concave mirror (curves inward)
+            # Concave mirror (curves inward toward the object)
             theta = np.linspace(-np.pi/3, np.pi/3, 100)
             radius = abs(self.focal_length) * 2 if self.focal_length else 10
-            x = -radius * 0.1 * np.cos(theta)
+            x = radius * 0.1 * np.cos(theta)  # Positive x curves toward the right (inward)
             y = radius * np.sin(theta)
             plt.plot(x, y, 'red', linewidth=4, label='Concave Mirror')
         else:
-            # Convex mirror (curves outward)
+            # Convex mirror (curves outward away from the object)
             theta = np.linspace(-np.pi/3, np.pi/3, 100)
             radius = abs(self.focal_length) * 2 if self.focal_length else 10
-            x = radius * 0.1 * np.cos(theta)
+            x = -radius * 0.1 * np.cos(theta)  # Negative x curves toward the left (outward)
             y = radius * np.sin(theta)
             plt.plot(x, y, 'red', linewidth=4, label='Convex Mirror')
     
