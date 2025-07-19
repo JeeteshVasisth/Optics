@@ -118,11 +118,21 @@ class OpticsCalculator:
                 
             elif self.focal_length is not None and self.u is not None and self.v is None:
                 # Calculate image distance
-                self.v = (self.focal_length * self.u) / (self.u - self.focal_length)
+                # Special case: when u = f, object is at focal point, image at infinity
+                if abs(self.u - self.focal_length) < 1e-6:
+                    self.v = float('inf') if self.focal_length < 0 else float('-inf')
+                    self.errors.append("Object at focal point - image formed at infinity (parallel rays)")
+                else:
+                    self.v = (self.focal_length * self.u) / (self.u - self.focal_length)
                 
             elif self.focal_length is not None and self.v is not None and self.u is None:
                 # Calculate object distance
-                self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
+                # Special case: when v = f, avoid division by zero
+                if abs(self.v - self.focal_length) < 1e-6:
+                    self.u = float('inf') if self.focal_length < 0 else float('-inf')
+                    self.errors.append("Image at focal point - object would be at infinity")
+                else:
+                    self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
             
             # Magnification calculations: m = -v/u = h2/h1
             if self.u is not None and self.v is not None:
@@ -179,11 +189,21 @@ class OpticsCalculator:
                 
             elif self.focal_length is not None and self.u is not None and self.v is None:
                 # Calculate image distance
-                self.v = (self.focal_length * self.u) / (self.u + self.focal_length)
+                # Special case: when u = -f, object is at focal point, image at infinity
+                if abs(self.u + self.focal_length) < 1e-6:
+                    self.v = float('inf') if self.focal_length > 0 else float('-inf')
+                    self.errors.append("Object at focal point - image formed at infinity (parallel rays)")
+                else:
+                    self.v = (self.focal_length * self.u) / (self.u + self.focal_length)
                 
             elif self.focal_length is not None and self.v is not None and self.u is None:
                 # Calculate object distance
-                self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
+                # Special case: when v = f, avoid division by zero
+                if abs(self.v - self.focal_length) < 1e-6:
+                    self.u = float('inf') if self.focal_length > 0 else float('-inf')
+                    self.errors.append("Image at focal point - object would be at infinity")
+                else:
+                    self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
             
             # Magnification calculations: m = v/u = h2/h1
             if self.u is not None and self.v is not None:
@@ -223,20 +243,30 @@ class OpticsCalculator:
     
     def _round_values(self):
         """Round calculated values to reasonable precision"""
-        if self.focal_length is not None:
+        if self.focal_length is not None and not math.isinf(self.focal_length):
             self.focal_length = round(self.focal_length, 3)
-        if self.u is not None:
+        if self.u is not None and not math.isinf(self.u):
             self.u = round(self.u, 3)
-        if self.v is not None:
+        if self.v is not None and not math.isinf(self.v):
             self.v = round(self.v, 3)
-        if self.h1 is not None:
+        if self.h1 is not None and not math.isinf(self.h1):
             self.h1 = round(self.h1, 3)
-        if self.h2 is not None:
+        if self.h2 is not None and not math.isinf(self.h2):
             self.h2 = round(self.h2, 3)
     
     def _analyze_image_characteristics(self, optic_type, shape):
         """Analyze and describe image characteristics"""
         if self.u is None or self.v is None or self.h1 is None or self.h2 is None:
+            return
+        
+        # Handle infinite values (object at focal point)
+        if math.isinf(self.v) or math.isinf(self.u):
+            self.image_characteristics = {
+                'nature': "Image at infinity",
+                'orientation': "Parallel rays",
+                'size': "Infinite",
+                'magnification': "∞"
+            }
             return
         
         magnification = abs(self.h2 / self.h1) if self.h1 != 0 else 0
