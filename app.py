@@ -449,8 +449,11 @@ class OpticsCalculator:
             radius = abs(f_val) * 2
             mirror_x = radius * 0.1 if shape == 'concave' else -radius * 0.1
             
-            # Determine if rays should be dotted (for virtual images)
-            ray_style = '--' if v_val < 0 else '-'  # Dotted for virtual images
+            # Determine if rays should be dotted (for virtual AND erect images)
+            # Virtual images have v < 0, erect images have same sign for h1 and h2
+            is_virtual = v_val < 0
+            is_erect = (h1_val * h2_val) > 0  # Same sign means erect
+            ray_style = '--' if (is_virtual and is_erect) else '-'  # Dotted only for virtual AND erect
             
             # Ray 1: Parallel to axis, reflects through focus
             plt.plot([u_val, mirror_x], [h1_val, h1_val], 'blue', linewidth=2, alpha=0.8, label='Ray 1: Parallel to axis')
