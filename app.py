@@ -604,9 +604,11 @@ class OpticsCalculator:
             
             # Ray 2: Through focus to mirror, reflects parallel to axis
             if shape == 'concave':
-                # Ray from object tip through focus to mirror, but hitting at same height as first ray
-                # Draw ray from object through focus to mirror at h1 height
-                plt.plot([u_val, mirror_x], [h1_val, h1_val], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
+                # Ray from object tip through focus to mirror
+                # First draw the ray from object to focus point
+                plt.plot([u_val, f_val], [h1_val, 0], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
+                # Then from focus to mirror at h1 height
+                plt.plot([f_val, mirror_x], [0, h1_val], 'red', linewidth=2, alpha=0.8)
                 # Reflected ray should end at image height (h2)
                 plt.plot([mirror_x, v_val], [h1_val, h2_val], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
             else:
