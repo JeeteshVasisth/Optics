@@ -449,27 +449,31 @@ class OpticsCalculator:
             radius = abs(f_val) * 2
             mirror_x = radius * 0.1 if shape == 'concave' else -radius * 0.1
             
+            # Determine if rays should be dotted (for virtual images)
+            ray_style = '--' if v_val < 0 else '-'  # Dotted for virtual images
+            
             # Ray 1: Parallel to axis, reflects through focus
             plt.plot([u_val, mirror_x], [h1_val, h1_val], 'blue', linewidth=2, alpha=0.8, label='Ray 1: Parallel to axis')
-            plt.plot([mirror_x, v_val], [h1_val, h2_val], 'blue', linewidth=2, alpha=0.8, linestyle='--')
+            plt.plot([mirror_x, v_val], [h1_val, h2_val], 'blue', linewidth=2, alpha=0.8, linestyle=ray_style)
             
             # Ray 2: Through focus to mirror, reflects parallel to axis
             if shape == 'concave':
-                # For concave mirror: ray aimed at focus hits mirror and reflects parallel
-                # Calculate intersection point on mirror for this ray
-                mirror_y_intersect = h1_val  # For simplicity, use same height
-                plt.plot([u_val, mirror_x], [h1_val, mirror_y_intersect], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
-                # Reflected ray goes parallel to axis at image height
-                plt.plot([mirror_x, v_val], [mirror_y_intersect, h2_val], 'red', linewidth=2, alpha=0.8, linestyle='--')
+                # Ray from object tip through focus to mirror
+                # Calculate where ray through focus hits the mirror
+                # For simplicity, we'll show it going from object to focus, then to mirror, then parallel
+                plt.plot([u_val, f_val], [h1_val, 0], 'red', linewidth=2, alpha=0.8, label='Ray 2: Through focus')
+                plt.plot([f_val, mirror_x], [0, h1_val], 'red', linewidth=2, alpha=0.8)
+                # Reflected ray goes parallel to axis
+                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
             else:
                 # For convex mirror: ray aimed toward focus (behind mirror) reflects parallel
                 plt.plot([u_val, mirror_x], [h1_val, h1_val], 'red', linewidth=2, alpha=0.8, label='Ray 2: Toward focus')
-                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'red', linewidth=2, alpha=0.8, linestyle='--')
+                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'red', linewidth=2, alpha=0.8, linestyle=ray_style)
             
             # Ray 3: Through center of curvature (normal incidence)
             center = 2 * f_val
             plt.plot([u_val, mirror_x], [h1_val, h1_val], 'green', linewidth=2, alpha=0.6, label='Ray 3: Normal incidence')
-            plt.plot([mirror_x, v_val], [h1_val, h2_val], 'green', linewidth=2, alpha=0.6, linestyle='--')
+            plt.plot([mirror_x, v_val], [h1_val, h2_val], 'green', linewidth=2, alpha=0.6, linestyle=ray_style)
             
         except (ValueError, TypeError):
             pass  # Skip ray drawing if values are invalid
