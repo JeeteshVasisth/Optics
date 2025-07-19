@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Optics Calculator - Mirrors & Lenses{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center mb-4">
+                <h1 class="display-4 mb-3">
+                    <i class="fas fa-eye text-primary me-3"></i>
+                    Optics Calculator
+                </h1>
+                <p class="lead text-muted">
+                    Calculate optical parameters and visualize ray diagrams for mirrors and lenses
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Input Panel -->
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sliders-h me-2"></i>
+                        Input Parameters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="opticsForm">
+                        <!-- Optic Type Selection -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Optic Type</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="optic_type" id="mirror" value="mirror" checked>
+                                    <label class="btn btn-outline-primary w-100" for="mirror">
+                                        <i class="fas fa-mirror me-2"></i>Mirror
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="optic_type" id="lens" value="lens">
+                                    <label class="btn btn-outline-primary w-100" for="lens">
+                                        <i class="fas fa-circle me-2"></i>Lens
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Shape Selection -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Shape</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="shape" id="concave" value="concave" checked>
+                                    <label class="btn btn-outline-secondary w-100" for="concave">
+                                        <i class="fas fa-chevron-left me-2"></i>Concave
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="shape" id="convex" value="convex">
+                                    <label class="btn btn-outline-secondary w-100" for="convex">
+                                        <i class="fas fa-chevron-right me-2"></i>Convex
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input Fields -->
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <label for="focal_length" class="form-label">
+                                    <i class="fas fa-crosshairs me-1"></i>
+                                    Focal Length (f)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="focal_length" step="0.1" placeholder="Enter value">
+                                    <span class="input-group-text">cm</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="u" class="form-label">
+                                    <i class="fas fa-arrow-left me-1"></i>
+                                    Object Distance (u)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="u" step="0.1" placeholder="Negative value">
+                                    <span class="input-group-text">cm</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="v" class="form-label">
+                                    <i class="fas fa-arrow-right me-1"></i>
+                                    Image Distance (v)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="v" step="0.1" placeholder="Enter value">
+                                    <span class="input-group-text">cm</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="h1" class="form-label">
+                                    <i class="fas fa-arrows-alt-v me-1"></i>
+                                    Object Height (h₁)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="h1" step="0.1" placeholder="Positive value">
+                                    <span class="input-group-text">cm</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="h2" class="form-label">
+                                    <i class="fas fa-arrows-alt-v me-1"></i>
+                                    Image Height (h₂)
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="h2" step="0.1" placeholder="Enter value">
+                                    <span class="input-group-text">cm</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-calculator me-2"></i>
+                                Calculate & Generate Diagram
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Help Section -->
+                    <div class="mt-4">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Sign Conventions:
+                            </h6>
+                            <ul class="mb-0 small">
+                                <li><strong>Object distance (u):</strong> Always negative</li>
+                                <li><strong>Image distance (v):</strong> Positive for real images, negative for virtual</li>
+                                <li><strong>Focal length (f):</strong> Positive for converging, negative for diverging</li>
+                                <li><strong>Heights:</strong> Positive upward, negative downward</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="col-lg-7">
+            <!-- Error Display -->
+            <div id="errorAlert" class="alert alert-danger d-none">
+                <h6 class="alert-heading">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Calculation Errors:
+                </h6>
+                <ul id="errorList" class="mb-0"></ul>
+            </div>
+
+            <!-- Warning Display -->
+            <div id="warningAlert" class="alert alert-warning d-none">
+                <h6 class="alert-heading">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Warnings:
+                </h6>
+                <ul id="warningList" class="mb-0"></ul>
+            </div>
+
+            <!-- Results Display -->
+            <div id="resultsCard" class="card mb-4 d-none">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Calculated Results
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3" id="resultsGrid">
+                        <!-- Results will be populated here -->
+                    </div>
+                    
+                    <!-- Image Characteristics -->
+                    <div id="imageCharacteristics" class="mt-4 d-none">
+                        <h6 class="fw-bold mb-3">
+                            <i class="fas fa-image me-2"></i>
+                            Image Characteristics:
+                        </h6>
+                        <div class="row g-2" id="characteristicsGrid">
+                            <!-- Characteristics will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ray Diagram -->
+            <div id="diagramCard" class="card d-none">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-project-diagram me-2"></i>
+                        Ray Diagram
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    <img id="rayDiagram" class="img-fluid rounded" alt="Ray Diagram">
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loadingIndicator" class="text-center d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Calculating...</span>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">Generating calculations and ray diagram...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/optics.js') }}"></script>
+{% endblock %}

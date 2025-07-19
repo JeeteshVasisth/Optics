@@ -1,0 +1,518 @@
+import os
+import logging
+from flask import Flask, render_template, request, jsonify
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import io
+import base64
+import math
+import numpy as np
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "default_secret_key_for_dev")
+
+class OpticsCalculator:
+    def __init__(self):
+        self.reset_values()
+    
+    def reset_values(self):
+        self.focal_length = None
+        self.u = None  # object distance (negative by convention)
+        self.v = None  # image distance
+        self.h1 = None  # object height (positive)
+        self.h2 = None  # image height
+        self.errors = []
+        self.warnings = []
+    
+    def validate_inputs(self, data, optic_type, shape):
+        """Enhanced input validation with detailed error messages"""
+        self.errors = []
+        self.warnings = []
+        
+        # Extract and validate focal length
+        if data.get('focal_length') is not None:
+            f = float(data['focal_length'])
+            if f == 0:
+                self.errors.append("Focal length cannot be zero")
+            elif optic_type == 'mirror':
+                if shape == 'concave' and f <= 0:
+                    self.errors.append("Concave mirror focal length must be positive")
+                elif shape == 'convex' and f <= 0:
+                    self.errors.append("Convex mirror focal length must be positive")
+            else:  # lens
+                if shape == 'convex' and f <= 0:
+                    self.errors.append("Convex lens focal length must be positive")
+                elif shape == 'concave' and f >= 0:
+                    self.errors.append("Concave lens focal length must be negative")
+        
+        # Validate object distance (should be negative by sign convention)
+        if data.get('u') is not None:
+            u = float(data['u'])
+            if u >= 0:
+                self.errors.append("Object distance (u) must be negative (object is on the left side)")
+        
+        # Validate object height (should be positive)
+        if data.get('h1') is not None:
+            h1 = float(data['h1'])
+            if h1 <= 0:
+                self.errors.append("Object height (h1) must be positive")
+        
+        # Count non-None values
+        given_values = sum(1 for key in ['focal_length', 'u', 'v', 'h1', 'h2'] 
+                          if data.get(key) is not None)
+        
+        if given_values < 2:
+            self.errors.append("At least 2 parameters must be provided for calculation")
+        
+        return len(self.errors) == 0
+    
+    def calculate_mirror(self, data, shape):
+        """Calculate mirror parameters using proper mirror formula"""
+        # Extract given values
+        self.focal_length = data.get('focal_length')
+        self.u = data.get('u')
+        self.v = data.get('v')
+        self.h1 = data.get('h1')
+        self.h2 = data.get('h2')
+        
+        try:
+            # Mirror formula: 1/f = 1/u + 1/v
+            # Note: u is negative, v can be positive or negative
+            
+            if self.u is not None and self.v is not None and self.focal_length is None:
+                # Calculate focal length from object and image distances
+                self.focal_length = (self.u * self.v) / (self.u + self.v)
+                
+            elif self.focal_length is not None and self.u is not None and self.v is None:
+                # Calculate image distance
+                self.v = (self.focal_length * self.u) / (self.u - self.focal_length)
+                
+            elif self.focal_length is not None and self.v is not None and self.u is None:
+                # Calculate object distance
+                self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
+            
+            # Magnification calculations: m = -v/u = h2/h1
+            if self.u is not None and self.v is not None:
+                magnification = -self.v / self.u
+                
+                if self.h1 is not None and self.h2 is None:
+                    self.h2 = magnification * self.h1
+                elif self.h2 is not None and self.h1 is None:
+                    self.h1 = self.h2 / magnification
+            
+            # If magnification info given but distances missing
+            if self.h1 is not None and self.h2 is not None:
+                magnification = self.h2 / self.h1
+                
+                if self.u is not None and self.v is None:
+                    self.v = -magnification * self.u
+                elif self.v is not None and self.u is None:
+                    self.u = -self.v / magnification
+            
+            # Set default object height if not given
+            if self.h1 is None and self.focal_length is not None:
+                self.h1 = abs(self.focal_length) * 0.3
+                if self.u is not None and self.v is not None:
+                    self.h2 = -(self.v / self.u) * self.h1
+            
+            # Round values for display
+            self._round_values()
+            
+            # Add image characteristics
+            self._analyze_image_characteristics('mirror', shape)
+            
+        except (ZeroDivisionError, TypeError) as e:
+            self.errors.append(f"Calculation error: {str(e)}")
+            return False
+        
+        return True
+    
+    def calculate_lens(self, data, shape):
+        """Calculate lens parameters using proper lens formula"""
+        # Extract given values
+        self.focal_length = data.get('focal_length')
+        self.u = data.get('u')
+        self.v = data.get('v')
+        self.h1 = data.get('h1')
+        self.h2 = data.get('h2')
+        
+        try:
+            # Lens formula: 1/f = 1/v - 1/u
+            # Note: u is negative, v can be positive or negative
+            
+            if self.u is not None and self.v is not None and self.focal_length is None:
+                # Calculate focal length from object and image distances
+                self.focal_length = (self.u * self.v) / (self.v - self.u)
+                
+            elif self.focal_length is not None and self.u is not None and self.v is None:
+                # Calculate image distance
+                self.v = (self.focal_length * self.u) / (self.u + self.focal_length)
+                
+            elif self.focal_length is not None and self.v is not None and self.u is None:
+                # Calculate object distance
+                self.u = (self.focal_length * self.v) / (self.v - self.focal_length)
+            
+            # Magnification calculations: m = v/u = h2/h1
+            if self.u is not None and self.v is not None:
+                magnification = self.v / self.u
+                
+                if self.h1 is not None and self.h2 is None:
+                    self.h2 = magnification * self.h1
+                elif self.h2 is not None and self.h1 is None:
+                    self.h1 = self.h2 / magnification
+            
+            # If magnification info given but distances missing
+            if self.h1 is not None and self.h2 is not None:
+                magnification = self.h2 / self.h1
+                
+                if self.u is not None and self.v is None:
+                    self.v = magnification * self.u
+                elif self.v is not None and self.u is None:
+                    self.u = self.v / magnification
+            
+            # Set default object height if not given
+            if self.h1 is None and self.focal_length is not None:
+                self.h1 = abs(self.focal_length) * 0.3
+                if self.u is not None and self.v is not None:
+                    self.h2 = (self.v / self.u) * self.h1
+            
+            # Round values for display
+            self._round_values()
+            
+            # Add image characteristics
+            self._analyze_image_characteristics('lens', shape)
+            
+        except (ZeroDivisionError, TypeError) as e:
+            self.errors.append(f"Calculation error: {str(e)}")
+            return False
+        
+        return True
+    
+    def _round_values(self):
+        """Round calculated values to reasonable precision"""
+        if self.focal_length is not None:
+            self.focal_length = round(self.focal_length, 3)
+        if self.u is not None:
+            self.u = round(self.u, 3)
+        if self.v is not None:
+            self.v = round(self.v, 3)
+        if self.h1 is not None:
+            self.h1 = round(self.h1, 3)
+        if self.h2 is not None:
+            self.h2 = round(self.h2, 3)
+    
+    def _analyze_image_characteristics(self, optic_type, shape):
+        """Analyze and describe image characteristics"""
+        if self.u is None or self.v is None or self.h1 is None or self.h2 is None:
+            return
+        
+        magnification = abs(self.h2 / self.h1) if self.h1 != 0 else 0
+        
+        # Image nature
+        if self.v > 0:
+            nature = "Real"
+        else:
+            nature = "Virtual"
+        
+        # Image orientation
+        if optic_type == 'mirror':
+            if self.h2 * self.h1 > 0:
+                orientation = "Erect"
+            else:
+                orientation = "Inverted"
+        else:  # lens
+            if self.h2 * self.h1 > 0:
+                orientation = "Erect"
+            else:
+                orientation = "Inverted"
+        
+        # Image size
+        if magnification > 1:
+            size = "Magnified"
+        elif magnification < 1:
+            size = "Diminished"
+        else:
+            size = "Same size"
+        
+        self.image_characteristics = {
+            'nature': nature,
+            'orientation': orientation,
+            'size': size,
+            'magnification': round(magnification, 3)
+        }
+    
+    def generate_diagram(self, optic_type, shape):
+        """Generate enhanced ray diagram"""
+        plt.figure(figsize=(14, 10))
+        plt.style.use('default')
+        
+        try:
+            if optic_type == 'mirror':
+                self._draw_mirror_diagram(shape)
+            else:  # lens
+                self._draw_lens_diagram(shape)
+            
+            plt.grid(True, alpha=0.3)
+            plt.legend(loc='upper right', fontsize=10)
+            plt.tight_layout()
+            
+            # Convert plot to base64 string
+            img_buffer = io.BytesIO()
+            plt.savefig(img_buffer, format='png', dpi=150, bbox_inches='tight', 
+                       facecolor='white', edgecolor='none')
+            img_buffer.seek(0)
+            img_str = base64.b64encode(img_buffer.read()).decode()
+            plt.close()
+            
+            return img_str
+        except Exception as e:
+            logging.error(f"Error generating diagram: {str(e)}")
+            plt.close()
+            return None
+    
+    def _draw_mirror_diagram(self, shape):
+        """Draw enhanced mirror ray diagram"""
+        # Set up coordinate system
+        max_dist = max(abs(self.u) if self.u else 10, abs(self.v) if self.v else 10, 
+                      abs(self.focal_length) if self.focal_length else 10)
+        axis_range = max_dist * 1.3
+        
+        # Principal axis
+        plt.axhline(y=0, color='black', linewidth=1, linestyle='-', alpha=0.8)
+        plt.axvline(x=0, color='gray', linewidth=0.5, linestyle='--', alpha=0.5)
+        
+        # Draw mirror
+        self._draw_mirror_surface(shape, axis_range)
+        
+        # Focus points
+        if self.focal_length is not None:
+            plt.plot(self.focal_length, 0, 'ro', markersize=8, label=f'Focus F (f={self.focal_length})')
+            plt.plot(2*self.focal_length, 0, 'ro', markersize=6, alpha=0.7, label=f'Center C')
+        
+        # Object
+        if self.u is not None and self.h1 is not None:
+            plt.arrow(self.u, 0, 0, self.h1, head_width=axis_range*0.02, 
+                     head_length=abs(self.h1)*0.1, fc='blue', ec='blue', linewidth=3)
+            plt.text(self.u, self.h1*1.1, 'Object', ha='center', fontsize=10, color='blue')
+        
+        # Image
+        if self.v is not None and self.h2 is not None:
+            style = '-' if self.v > 0 else '--'
+            color = 'green' if self.v > 0 else 'orange'
+            plt.arrow(self.v, 0, 0, self.h2, head_width=axis_range*0.02, 
+                     head_length=abs(self.h2)*0.1, fc=color, ec=color, 
+                     linewidth=3, linestyle=style)
+            label = 'Real Image' if self.v > 0 else 'Virtual Image'
+            plt.text(self.v, self.h2*1.1, label, ha='center', fontsize=10, color=color)
+        
+        # Draw rays
+        self._draw_mirror_rays(shape)
+        
+        plt.xlim(-axis_range, axis_range)
+        plt.ylim(-axis_range*0.8, axis_range*0.8)
+        plt.xlabel('Distance from Mirror', fontsize=12)
+        plt.ylabel('Height', fontsize=12)
+        plt.title(f'{shape.title()} Mirror Ray Diagram', fontsize=14, fontweight='bold')
+    
+    def _draw_lens_diagram(self, shape):
+        """Draw enhanced lens ray diagram"""
+        # Set up coordinate system
+        max_dist = max(abs(self.u) if self.u else 10, abs(self.v) if self.v else 10, 
+                      abs(self.focal_length) if self.focal_length else 10)
+        axis_range = max_dist * 1.3
+        
+        # Principal axis
+        plt.axhline(y=0, color='black', linewidth=1, linestyle='-', alpha=0.8)
+        plt.axvline(x=0, color='gray', linewidth=0.5, linestyle='--', alpha=0.5)
+        
+        # Draw lens
+        self._draw_lens_surface(shape, axis_range)
+        
+        # Focus points
+        if self.focal_length is not None:
+            plt.plot([self.focal_length, -self.focal_length], [0, 0], 'ro', markersize=8)
+            plt.text(self.focal_length, -axis_range*0.1, f'F ({self.focal_length})', 
+                    ha='center', fontsize=10, color='red')
+            plt.text(-self.focal_length, -axis_range*0.1, f'F ({-self.focal_length})', 
+                    ha='center', fontsize=10, color='red')
+        
+        # Object
+        if self.u is not None and self.h1 is not None:
+            plt.arrow(self.u, 0, 0, self.h1, head_width=axis_range*0.02, 
+                     head_length=abs(self.h1)*0.1, fc='blue', ec='blue', linewidth=3)
+            plt.text(self.u, self.h1*1.1, 'Object', ha='center', fontsize=10, color='blue')
+        
+        # Image
+        if self.v is not None and self.h2 is not None:
+            style = '-' if self.v > 0 else '--'
+            color = 'green' if self.v > 0 else 'orange'
+            plt.arrow(self.v, 0, 0, self.h2, head_width=axis_range*0.02, 
+                     head_length=abs(self.h2)*0.1, fc=color, ec=color, 
+                     linewidth=3, linestyle=style)
+            label = 'Real Image' if self.v > 0 else 'Virtual Image'
+            plt.text(self.v, self.h2*1.1, label, ha='center', fontsize=10, color=color)
+        
+        # Draw rays
+        self._draw_lens_rays(shape)
+        
+        plt.xlim(-axis_range, axis_range)
+        plt.ylim(-axis_range*0.8, axis_range*0.8)
+        plt.xlabel('Distance from Lens', fontsize=12)
+        plt.ylabel('Height', fontsize=12)
+        plt.title(f'{shape.title()} Lens Ray Diagram', fontsize=14, fontweight='bold')
+    
+    def _draw_mirror_surface(self, shape, axis_range):
+        """Draw mirror surface"""
+        if shape == 'concave':
+            # Concave mirror (curves inward)
+            theta = np.linspace(-np.pi/3, np.pi/3, 100)
+            radius = abs(self.focal_length) * 2 if self.focal_length else 10
+            x = -radius * 0.1 * np.cos(theta)
+            y = radius * np.sin(theta)
+            plt.plot(x, y, 'red', linewidth=4, label='Concave Mirror')
+        else:
+            # Convex mirror (curves outward)
+            theta = np.linspace(-np.pi/3, np.pi/3, 100)
+            radius = abs(self.focal_length) * 2 if self.focal_length else 10
+            x = radius * 0.1 * np.cos(theta)
+            y = radius * np.sin(theta)
+            plt.plot(x, y, 'red', linewidth=4, label='Convex Mirror')
+    
+    def _draw_lens_surface(self, shape, axis_range):
+        """Draw lens surface"""
+        lens_height = axis_range * 0.6
+        
+        if shape == 'convex':
+            # Convex lens (biconvex)
+            y_vals = np.linspace(-lens_height, lens_height, 100)
+            thickness = lens_height * 0.1
+            x_left = -thickness * (1 - (y_vals / lens_height) ** 2)
+            x_right = thickness * (1 - (y_vals / lens_height) ** 2)
+            plt.plot(x_left, y_vals, 'red', linewidth=3)
+            plt.plot(x_right, y_vals, 'red', linewidth=3, label='Convex Lens')
+        else:
+            # Concave lens (biconcave)
+            y_vals = np.linspace(-lens_height, lens_height, 100)
+            thickness = lens_height * 0.1
+            x_left = thickness * (1 - (y_vals / lens_height) ** 2)
+            x_right = -thickness * (1 - (y_vals / lens_height) ** 2)
+            plt.plot(x_left, y_vals, 'red', linewidth=3)
+            plt.plot(x_right, y_vals, 'red', linewidth=3, label='Concave Lens')
+    
+    def _draw_mirror_rays(self, shape):
+        """Draw principal rays for mirrors"""
+        if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
+            return
+        
+        # Ray 1: Parallel to axis, reflects through focus
+        plt.plot([self.u, 0], [self.h1, self.h1], 'gray', linewidth=1.5, alpha=0.8)
+        plt.plot([0, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
+        
+        # Ray 2: Through focus, reflects parallel to axis
+        plt.plot([self.u, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
+        plt.plot([self.focal_length, self.v], [0, self.h2], 'gray', linewidth=1.5, alpha=0.8)
+        
+        # Ray 3: Through center of curvature
+        center = 2 * self.focal_length if self.focal_length else 0
+        plt.plot([self.u, center], [self.h1, 0], 'lightblue', linewidth=1, alpha=0.6)
+        plt.plot([center, self.v], [0, self.h2], 'lightblue', linewidth=1, alpha=0.6)
+    
+    def _draw_lens_rays(self, shape):
+        """Draw principal rays for lenses"""
+        if not all([self.u, self.v, self.h1, self.h2, self.focal_length]):
+            return
+        
+        # Ray 1: Parallel to axis, refracts through focus
+        plt.plot([self.u, 0], [self.h1, self.h1], 'gray', linewidth=1.5, alpha=0.8)
+        plt.plot([0, self.focal_length], [self.h1, 0], 'gray', linewidth=1.5, alpha=0.8)
+        
+        # Ray 2: Through optical center (undeviated)
+        plt.plot([self.u, 0], [self.h1, 0], 'lightblue', linewidth=1.5, alpha=0.8)
+        plt.plot([0, self.v], [0, self.h2], 'lightblue', linewidth=1.5, alpha=0.8)
+        
+        # Ray 3: Through focus, emerges parallel to axis
+        plt.plot([self.u, -self.focal_length], [self.h1, 0], 'lightgreen', linewidth=1, alpha=0.6)
+        plt.plot([-self.focal_length, 0], [0, self.h1], 'lightgreen', linewidth=1, alpha=0.6)
+        plt.plot([0, self.v], [self.h1, self.h2], 'lightgreen', linewidth=1, alpha=0.6)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/calculate', methods=['POST'])
+def calculate():
+    try:
+        data = request.get_json()
+        optic_type = data.get('optic_type')
+        shape = data.get('shape')
+        
+        # Extract numerical inputs
+        inputs = {}
+        for key in ['focal_length', 'u', 'v', 'h1', 'h2']:
+            value = data.get(key)
+            if value is not None and str(value).strip() != '':
+                try:
+                    inputs[key] = float(value)
+                except ValueError:
+                    return jsonify({
+                        'success': False,
+                        'errors': [f"Invalid value for {key}: must be a number"]
+                    })
+        
+        calculator = OpticsCalculator()
+        
+        # Validate inputs
+        if not calculator.validate_inputs(inputs, optic_type, shape):
+            return jsonify({
+                'success': False,
+                'errors': calculator.errors
+            })
+        
+        # Perform calculations
+        if optic_type == 'mirror':
+            success = calculator.calculate_mirror(inputs, shape)
+        else:
+            success = calculator.calculate_lens(inputs, shape)
+        
+        if not success:
+            return jsonify({
+                'success': False,
+                'errors': calculator.errors
+            })
+        
+        # Generate diagram
+        diagram_base64 = calculator.generate_diagram(optic_type, shape)
+        
+        # Prepare response
+        result = {
+            'success': True,
+            'results': {
+                'focal_length': calculator.focal_length,
+                'u': calculator.u,
+                'v': calculator.v,
+                'h1': calculator.h1,
+                'h2': calculator.h2
+            },
+            'diagram': diagram_base64,
+            'warnings': calculator.warnings
+        }
+        
+        # Add image characteristics if available
+        if hasattr(calculator, 'image_characteristics'):
+            result['image_characteristics'] = calculator.image_characteristics
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"Calculation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'errors': [f"Server error: {str(e)}"]
+        })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
