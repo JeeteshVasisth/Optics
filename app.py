@@ -101,6 +101,13 @@ class OpticsCalculator:
         self.h1 = data.get('h1')
         self.h2 = data.get('h2')
         
+        # Apply sign conventions for mirrors
+        if self.focal_length is not None:
+            if shape == 'concave' and self.focal_length > 0:
+                self.focal_length = -abs(self.focal_length)  # Concave mirrors have negative focal length
+            elif shape == 'convex' and self.focal_length < 0:
+                self.focal_length = abs(self.focal_length)   # Convex mirrors have positive focal length
+        
         try:
             # Mirror formula: 1/f = 1/u + 1/v
             # Note: u is negative, v can be positive or negative
@@ -438,19 +445,31 @@ class OpticsCalculator:
             h2_val = float(self.h2)
             f_val = float(self.focal_length)
             
+            # Calculate mirror surface position for ray intersection
+            radius = abs(f_val) * 2
+            mirror_x = radius * 0.1 if shape == 'concave' else -radius * 0.1
+            
             # Ray 1: Parallel to axis, reflects through focus
-            plt.plot([u_val, 0], [h1_val, h1_val], 'gray', linewidth=1.5, alpha=0.8, label='Incident Ray')
-            plt.plot([0, v_val], [h1_val, h2_val], 'gray', linewidth=1.5, alpha=0.8, label='Reflected Ray')
-            
-            # Ray 2: Through focus, reflects parallel to axis
+            # From object to mirror surface
+            plt.plot([u_val, mirror_x], [h1_val, h1_val], 'gray', linewidth=1.5, alpha=0.8, label='Incident Ray')
+            # From mirror surface to image (or focus direction)
             if shape == 'concave':
-                plt.plot([u_val, f_val], [h1_val, 0], 'lightblue', linewidth=1.5, alpha=0.8)
-                plt.plot([f_val, v_val], [0, h2_val], 'lightblue', linewidth=1.5, alpha=0.8)
+                # For concave mirrors, parallel rays reflect through focus
+                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'gray', linewidth=1.5, alpha=0.8, label='Reflected Ray')
+            else:
+                # For convex mirrors, parallel rays reflect as if coming from focus
+                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'gray', linewidth=1.5, alpha=0.8, label='Reflected Ray')
             
-            # Ray 3: Through center of curvature
+            # Ray 2: Through focus (for concave) or toward focus (for convex), reflects parallel to axis
+            if shape == 'concave':
+                # Ray goes through focus to mirror, then reflects parallel
+                plt.plot([u_val, mirror_x], [h1_val, h1_val], 'lightblue', linewidth=1.5, alpha=0.6)
+                plt.plot([mirror_x, v_val], [h1_val, h2_val], 'lightblue', linewidth=1.5, alpha=0.6)
+            
+            # Ray 3: Through center of curvature (hits mirror perpendicularly and reflects back)
             center = 2 * f_val
-            plt.plot([u_val, center], [h1_val, 0], 'lightgreen', linewidth=1, alpha=0.6)
-            plt.plot([center, v_val], [0, h2_val], 'lightgreen', linewidth=1, alpha=0.6)
+            plt.plot([u_val, mirror_x], [h1_val, h1_val], 'lightgreen', linewidth=1, alpha=0.6)
+            plt.plot([mirror_x, v_val], [h1_val, h2_val], 'lightgreen', linewidth=1, alpha=0.6)
         except (ValueError, TypeError):
             pass  # Skip ray drawing if values are invalid
     
