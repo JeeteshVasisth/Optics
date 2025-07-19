@@ -104,9 +104,9 @@ class OpticsCalculator:
         # Apply sign conventions for mirrors
         if self.focal_length is not None:
             if shape == 'concave' and self.focal_length > 0:
-                self.focal_length = -abs(self.focal_length)  # Concave mirrors have negative focal length
+                self.focal_length = abs(self.focal_length)   # Concave mirrors have positive focal length  
             elif shape == 'convex' and self.focal_length < 0:
-                self.focal_length = abs(self.focal_length)   # Convex mirrors have positive focal length
+                self.focal_length = -abs(self.focal_length)  # Convex mirrors have negative focal length
         
         try:
             # Mirror formula: 1/f = 1/u + 1/v
