@@ -1,1 +1,3 @@
-"flask\nnumpy\nmatplotlib" 
+flask
+numpy
+matplotlib
